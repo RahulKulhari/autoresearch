@@ -1,0 +1,45 @@
+{
+  "transcript_id": "T8",
+  "task_id": "task-001",
+  "task_title": "Fix tokenizer cache corruption under concurrent access",
+  "agent": "failing-agent",
+  "total_actions": 121,
+  "wall_seconds": 963,
+  "summary": "Near-total failure. Agent hallucinated file paths that don't exist, ran the same broken command 7 times, never read the actual source files it needed to modify, and declared success after the test run showed 1/13 passing (the 1 test that passes at baseline). The single passing test was already passing before any changes.",
+  "key_events": [
+    {"action": 1,  "type": "read",   "detail": "Tried to read 'src/tokenizer.py' — file does not exist"},
+    {"action": 2,  "type": "read",   "detail": "Tried to read 'lib/cache.py' — file does not exist"},
+    {"action": 3,  "type": "read",   "detail": "Tried to read 'utils/atomicwrite.py' — file does not exist"},
+    {"action": 4,  "type": "list",   "detail": "Finally listed actual files, found prepare.py"},
+    {"action": 8,  "type": "edit",   "detail": "Edited a non-existent function 'write_cache_safe' in prepare.py"},
+    {"action": 9,  "type": "test",   "detail": "NameError: write_cache_safe not defined"},
+    {"action": 10, "type": "edit",   "detail": "Tried same edit again"},
+    {"action": 11, "type": "test",   "detail": "Same NameError"},
+    {"action": 12, "type": "edit",   "detail": "Same edit, third attempt"},
+    {"action": 13, "type": "test",   "detail": "Same NameError"},
+    {"action": 14, "type": "edit",   "detail": "Same edit, fourth attempt"},
+    {"action": 15, "type": "test",   "detail": "Same NameError"},
+    {"action": 40, "type": "test",   "detail": "1/13 pass (baseline passing test)"},
+    {"action": 121,"type": "done",   "detail": "Declared 'implementation complete' — did not read test output carefully"}
+  ],
+  "errors_encountered": [
+    {"action": 9,  "type": "NameError", "detail": "Called non-existent function", "recovery": "retried same approach 6 more times"},
+    {"action": 10, "type": "NameError", "detail": "Same error", "recovery": "no strategy change"},
+    {"action": 11, "type": "NameError", "detail": "Same error", "recovery": "no strategy change"},
+    {"action": 12, "type": "NameError", "detail": "Same error", "recovery": "no strategy change"},
+    {"action": 13, "type": "NameError", "detail": "Same error", "recovery": "no strategy change"},
+    {"action": 14, "type": "NameError", "detail": "Same error", "recovery": "no strategy change"},
+    {"action": 15, "type": "NameError", "detail": "Same error — 7 total identical retries"}
+  ],
+  "spec_violations": [
+    {"detail": "No atomic write implemented"},
+    {"detail": "No validation or RuntimeError implemented"},
+    {"detail": "No actual changes to the relevant code paths"}
+  ],
+  "repeated_failures": [
+    {"detail": "Same NameError retried 7 consecutive times without strategy change"}
+  ],
+  "termination": "declared_success_while_tests_fail",
+  "final_test_result": {"passed": 1, "failed": 12, "pass_rate": 0.077},
+  "code_quality_notes": "Changes made are to a function that does not exist. Effective diff against baseline is empty for the relevant code paths."
+}
