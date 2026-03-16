@@ -18,6 +18,7 @@
     "val_bpb output is identical whether or not a checkpoint was used (deterministic up to hardware)",
     "All existing train.py and prepare.py tests pass"
   ],
+  "criteria_weights": [3, 3, 3, 2, 3, 3, 3, 2, 2, 1],
   "test_command": "python -m pytest eval/tests/test_checkpointing.py eval/tests/test_prepare.py -v",
   "budget": {
     "max_actions": 120,

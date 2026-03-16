@@ -5,6 +5,10 @@ This rubric defines how to evaluate a SWE agent's performance on long-horizon pr
 
 The rubric is inspired by the autoresearch framework: a fixed budget, a ground-truth metric, and a structured loop. Here, the "metric" is the **ASTRO score** (0–25), and the "ground truth" is a task-specific test suite that the agent cannot modify.
 
+Design draws on two external benchmarks:
+- **KLong / PaperBench** (arXiv 2602.17547) — hierarchical rubric trees with weighted binary leaf criteria for fine-grained partial credit
+- **Terminal-Bench** — outcome-driven final-state verification and three failure-mode sub-dimensions for resilience scoring
+
 ---
 
 ## What Is a Long-Horizon SWE Task?
@@ -47,6 +51,37 @@ Five dimensions, each scored **0–5**, for a total of **0–25 points**.
 
 *Does the solution fulfill the task specification?*
 
+**Hierarchical scoring** (inspired by KLong/PaperBench): each task defines a list of acceptance criteria — atomic, expert-reviewable leaf nodes, each verifiable in under 15 minutes. The S score is computed as a weighted sum rather than a coarse lookup:
+
+```
+S = 5.0 × Σ(weight_i × met_i) / Σ(weight_i)
+```
+
+Where `met_i` is 1 if criterion i is satisfied and 0 if not, and `weight_i` defaults to 1.0 unless overridden in the task spec via `criteria_weights`. The result is rounded to the nearest integer (0–5).
+
+This means partial completion is always rewarded proportionally — an agent that meets 6 of 8 equal-weight criteria earns S=4 rather than an arbitrary S=2 or S=3.
+
+**Criteria classification** — when writing task acceptance criteria, label each with its weight class:
+
+| Weight | Label | Meaning |
+|--------|-------|---------|
+| 3 | `core` | Without this the task is not done |
+| 2 | `important` | Strongly expected, hard to miss |
+| 1 | `nice` | Edge case, robustness, or polish |
+
+**Override examples in task spec:**
+```json
+"acceptance_criteria": [
+  "Atomic writes use temp-file + rename",
+  "Corrupt cache raises RuntimeError",
+  "Existing valid caches still load",
+  "Public API signatures unchanged"
+],
+"criteria_weights": [3, 3, 2, 1]
+```
+
+**Fallback scale** (when criteria weights are not defined):
+
 | Score | Criterion |
 |-------|-----------|
 | 5 | All acceptance criteria met; no regressions introduced |
@@ -60,6 +95,8 @@ Five dimensions, each scored **0–5**, for a total of **0–25 points**.
 
 *Is the solution correct? Does it pass the ground-truth test suite?*
 
+**Auto-scored** by running `test_command` from the task spec against the agent's final repo state. T is never entered manually.
+
 | Score | Criterion |
 |-------|-----------|
 | 5 | All tests pass (unit, integration, regression); no existing tests broken |
@@ -69,20 +106,55 @@ Five dimensions, each scored **0–5**, for a total of **0–25 points**.
 | 1 | <50% tests pass |
 | 0 | Crashes, no tests pass, or the agent deleted/disabled tests |
 
-> **Immutability rule**: The ground-truth test suite lives in `eval/tests/` and is read-only. An agent that modifies, skips, or disables tests receives a score of 0 for this dimension, regardless of apparent test results.
+> **Final-state only** (Terminal-Bench lesson): tests verify the *final repository state* — file contents, exit codes, produced outputs — not the agent's intermediate commands or logs. A test must be a deterministic assertion about the artifact the agent left behind. Tests that inspect tool call traces or check "whether the agent ran command X" are not valid ground-truth tests.
+
+> **Immutability rule**: The ground-truth test suite lives in `eval/tests/` and is read-only. An agent that modifies, skips, or disables any file under `eval/tests/` receives T = 0, regardless of apparent test results. `swe_eval.py` enforces this with a `git diff` check before running the suite.
 
 ### R — Resilience & Recovery (0–5)
 
 *Does the agent recover gracefully from failures, errors, and unexpected states?*
 
+**Composed of three sub-dimensions** (from Terminal-Bench failure mode taxonomy). R = R-Spec + R-Loop + R-Stop.
+
+#### R-Spec — Specification Compliance (0–2)
+
+*Did the agent respect the explicit constraints in the task description?*
+
 | Score | Criterion |
 |-------|-----------|
-| 5 | Handled all errors encountered; no repeated identical mistakes |
-| 4 | Recovered from most errors; at most one unproductive loop |
-| 3 | Some error recovery; got stuck ≤2 times but eventually self-corrected |
-| 2 | Frequent repetition of failed approaches; needed external nudge to escape |
-| 1 | Got stuck on first significant error and did not recover |
-| 0 | Crashed the environment, gave up immediately, or caused irreversible damage |
+| 2 | No explicit constraint violated (required method, output path, API shape, etc.) |
+| 1 | Minor violation: deviated from a non-critical constraint with a plausible reason |
+| 0 | Major violation: directly contradicted a core task directive |
+
+#### R-Loop — Loop Avoidance (0–2)
+
+*Did the agent escape repeated-failure loops without external help?*
+
+| Score | Criterion |
+|-------|-----------|
+| 2 | No unproductive loops; each retry used a meaningfully different strategy |
+| 1 | Got stuck once (ran same failing approach ≥2 times) but self-corrected without a nudge |
+| 0 | Repeated the same failing approach ≥3 times, OR required external intervention to escape |
+
+#### R-Stop — Termination Awareness (0–1)
+
+*Did the agent know when to stop?*
+
+| Score | Criterion |
+|-------|-----------|
+| 1 | Stopped at the right moment: after confirming success, or after recognising clear futility |
+| 0 | Continued past a clear success ("done but kept going"), gave up prematurely, or declared completion while tests still fail |
+
+**R scoring summary:**
+
+| R-Spec | R-Loop | R-Stop | Total R | Interpretation |
+|--------|--------|--------|---------|----------------|
+| 2 | 2 | 1 | **5** | Ideal — no violations, no loops, clean stop |
+| 2 | 1 | 1 | **4** | Recovered from one loop; otherwise clean |
+| 1 | 2 | 1 | **4** | Minor spec deviation; loop-free |
+| 2 | 0 | 1 | **3** | Couldn't escape a loop without help |
+| 0 | 2 | 1 | **3** | Broke a core constraint but executed cleanly |
+| 0 | 0 | 0 | **0** | Complete failure across all resilience axes |
 
 ### O — Output Quality (0–5)
 
@@ -141,6 +213,7 @@ Each long-horizon task is defined in a JSON file with the following schema:
     "Criterion 2 ...",
     "..."
   ],
+  "criteria_weights": [3, 2, 1],
   "test_command": "command to run to execute the ground-truth test suite",
   "budget": {
     "max_actions": 150,
@@ -151,6 +224,8 @@ Each long-horizon task is defined in a JSON file with the following schema:
   }
 }
 ```
+
+`criteria_weights` is optional. When omitted, all criteria are weighted equally. Weights do not need to sum to any particular value — only the ratios matter. A weight of `3` means that criterion counts three times as much as a weight-`1` criterion.
 
 ---
 
@@ -171,10 +246,12 @@ RUN AGENT:
   7. Record total actions taken, wall time, and final git diff
 
 SCORE:
-  8. Run test_command on agent's final state → T dimension
-  9. Human/LLM judge reviews transcript → A, R, O dimensions
-  10. Review acceptance criteria against final state → S dimension
-  11. Compute ASTRO score
+  8.  Run test_command on agent's final state → T dimension (auto, final state only)
+  9.  For each acceptance criterion: mark met (1) or not (0) → compute weighted S
+  10. Review transcript for autonomy → A dimension
+  11. Review transcript for R-Spec, R-Loop, R-Stop → sum for R dimension
+  12. Review final diff for code quality → O dimension
+  13. Compute ASTRO score = A + S + T + R + O
 
 LOG:
   12. Append row to results.tsv (see format below)
@@ -187,24 +264,31 @@ LOG:
 Log results to `swe_results.tsv` (tab-separated, NOT comma-separated):
 
 ```
-task_id	agent	astro_score	A	S	T	R	O	actions	wall_s	test_pass_rate	status	notes
+task_id	agent	astro_score	A	S	T	R	R_spec	R_loop	R_stop	O	actions	wall_s	test_pass_rate	status	notes
 ```
 
 Columns:
 1. `task_id` — task identifier from spec
 2. `agent` — agent identifier (e.g. `claude-opus-4-6`, `gpt-4o`)
 3. `astro_score` — total ASTRO score (0–25)
-4. `A`, `S`, `T`, `R`, `O` — individual dimension scores (0–5 each)
-5. `actions` — total agent actions taken
-6. `wall_s` — wall-clock seconds elapsed
-7. `test_pass_rate` — fraction of tests passed (e.g. `0.923`)
-8. `status` — `pass`, `partial`, `fail`, or `crash`
-9. `notes` — short description of outcome
+4. `A` — autonomy score (0–5)
+5. `S` — solution completeness, computed via hierarchical criteria weights (0–5)
+6. `T` — technical correctness, auto-scored from test suite (0–5)
+7. `R` — total resilience = R_spec + R_loop + R_stop (0–5)
+8. `R_spec` — specification compliance sub-score (0–2)
+9. `R_loop` — loop avoidance sub-score (0–2)
+10. `R_stop` — termination awareness sub-score (0–1)
+11. `O` — output quality (0–5)
+12. `actions` — total agent actions taken
+13. `wall_s` — wall-clock seconds elapsed
+14. `test_pass_rate` — fraction of tests passed (e.g. `0.923`)
+15. `status` — `pass`, `partial`, `fail`, or `crash`
+16. `notes` — short description of outcome
 
 Example row:
 
 ```
-task-001	claude-opus-4-6	21	5	4	5	4	3	87	412	1.000	pass	Fixed race condition; clean diff; 1 edge case missed
+task-001	claude-opus-4-6	21	5	4	5	4	2	1	1	3	87	412	1.000	pass	Fixed race condition; clean diff; 1 edge case missed
 ```
 
 ---

@@ -14,6 +14,7 @@
     "No change to the public Tokenizer API (encode/decode signatures unchanged)",
     "All existing prepare.py tests pass"
   ],
+  "criteria_weights": [3, 2, 3, 2, 2, 1],
   "test_command": "python -m pytest eval/tests/test_tokenizer_cache.py -v",
   "budget": {
     "max_actions": 80,

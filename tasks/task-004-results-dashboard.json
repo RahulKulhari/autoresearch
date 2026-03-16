@@ -19,6 +19,7 @@
     "--kept-only flag works correctly",
     "All dashboard tests pass"
   ],
+  "criteria_weights": [2, 3, 2, 2, 2, 2, 2, 1, 1, 1, 2],
   "test_command": "python -m pytest eval/tests/test_results_dashboard.py -v",
   "budget": {
     "max_actions": 100,

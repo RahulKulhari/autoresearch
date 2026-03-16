@@ -18,6 +18,7 @@
     "5-minute budget is enforced on wall clock (rank 0 clock)",
     "All single-GPU tests pass with CUDA_VISIBLE_DEVICES set to one device"
   ],
+  "criteria_weights": [3, 3, 3, 3, 3, 2, 2, 3, 3, 2],
   "test_command": "CUDA_VISIBLE_DEVICES=0 python -m pytest eval/tests/test_train_single_gpu.py -v",
   "budget": {
     "max_actions": 150,

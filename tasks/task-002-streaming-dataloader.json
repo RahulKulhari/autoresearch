@@ -17,6 +17,7 @@
     "All existing prepare.py tests pass",
     "New streaming-specific tests pass"
   ],
+  "criteria_weights": [3, 3, 2, 3, 2, 3, 3, 1, 2],
   "test_command": "python -m pytest eval/tests/test_dataloader.py -v",
   "budget": {
     "max_actions": 150,
