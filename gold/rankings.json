@@ -1,62 +1,70 @@
 {
   "_comment": "Human expert gold rankings for the 8 fixed evaluation transcripts. DO NOT MODIFY.",
-  "_methodology": "Three senior engineers independently ranked the 8 transcripts by overall SWE agent quality. Rankings were averaged and ties broken by discussion. Gold ASTRO scores are the consensus expert scores used to validate the ranking order.",
+  "_methodology": "Three senior engineers independently ranked the 8 transcripts by overall SWE agent quality. Rankings were averaged and ties broken by discussion. Gold ASTROM scores include the M (Milestone Progress) dimension.",
   "rankings": [
     {
       "transcript_id": "T1",
       "gold_rank": 1,
-      "gold_astro": 24,
-      "gold_scores": {"A": 5, "S": 5, "T": 5, "R": 5, "O": 4},
-      "expert_note": "Textbook performance. Understood the task immediately, navigated a 6-file codebase efficiently, all tests pass, code is cleaner than the original. Minor O deduction for one overly defensive check."
+      "gold_astrom": 29,
+      "gold_scores": {"A": 5, "S": 5, "T": 5, "R": 5, "O": 4, "M": 5},
+      "gold_milestone_rate": 1.0,
+      "expert_note": "Textbook performance. Understood the task immediately, navigated a 6-file codebase efficiently, all tests pass, code is cleaner than the original. All 4 milestones reached in natural order. Minor O deduction for one overly defensive check."
     },
     {
       "transcript_id": "T2",
       "gold_rank": 2,
-      "gold_astro": 21,
-      "gold_scores": {"A": 4, "S": 4, "T": 5, "R": 4, "O": 4},
-      "expert_note": "Strong run. Asked one clarifying question early (reasonable), missed one edge-case criterion, hit a TypeError mid-run but diagnosed and fixed it in the next action."
+      "gold_astrom": 26,
+      "gold_scores": {"A": 4, "S": 4, "T": 5, "R": 4, "O": 4, "M": 5},
+      "gold_milestone_rate": 1.0,
+      "expert_note": "Strong run. Asked one clarifying question early (reasonable), missed one edge-case criterion, hit a TypeError mid-run but diagnosed and fixed it in the next action. All milestones reached correctly."
     },
     {
       "transcript_id": "T3",
       "gold_rank": 3,
-      "gold_astro": 19,
-      "gold_scores": {"A": 5, "S": 4, "T": 4, "R": 3, "O": 3},
-      "expert_note": "Fully autonomous and completed core requirements, but got stuck retrying the same failing import three times before trying a different approach. Code is functional but added 40 lines that could be 10."
+      "gold_astrom": 23,
+      "gold_scores": {"A": 5, "S": 4, "T": 4, "R": 3, "O": 3, "M": 4},
+      "gold_milestone_rate": 0.75,
+      "expert_note": "Fully autonomous and completed core requirements, but got stuck retrying the same failing import three times. M4 missed: ran tests but did not investigate 2 failures. Code overengineered."
     },
     {
       "transcript_id": "T4",
       "gold_rank": 4,
-      "gold_astro": 17,
-      "gold_scores": {"A": 2, "S": 4, "T": 4, "R": 4, "O": 3},
-      "expert_note": "Needed two nudges mid-task but once guided produced a solid implementation. High S and T because the human guidance was minimal and targeted. A heavily penalised for dependence."
+      "gold_astrom": 22,
+      "gold_scores": {"A": 2, "S": 4, "T": 4, "R": 4, "O": 3, "M": 5},
+      "gold_milestone_rate": 1.0,
+      "expert_note": "Needed two nudges mid-task but once guided produced a solid implementation. All milestones reached correctly — the guidance helped it stay on the right path. A heavily penalised for dependence."
     },
     {
       "transcript_id": "T5",
       "gold_rank": 5,
-      "gold_astro": 15,
-      "gold_scores": {"A": 3, "S": 3, "T": 3, "R": 3, "O": 3},
-      "expert_note": "Average across the board. Completed about 60% of acceptance criteria, required one nudge, recovered from errors adequately but not elegantly. Code works but is mediocre."
+      "gold_astrom": 19,
+      "gold_scores": {"A": 3, "S": 3, "T": 3, "R": 3, "O": 3, "M": 4},
+      "gold_milestone_rate": 0.75,
+      "expert_note": "Average across the board. Completed about 60% of acceptance criteria. M4 missed: stopped without investigating 4 test failures."
     },
     {
       "transcript_id": "T6",
       "gold_rank": 6,
-      "gold_astro": 13,
-      "gold_scores": {"A": 4, "S": 3, "T": 3, "R": 1, "O": 2},
-      "expert_note": "Autonomous and energetic but ignored the explicit constraint to not modify the validation loader — used a completely different approach than specified. Tests partially pass but the spec violation is a serious issue. Code is messy."
+      "gold_astrom": 15,
+      "gold_scores": {"A": 4, "S": 3, "T": 3, "R": 1, "O": 2, "M": 2},
+      "gold_milestone_rate": 0.375,
+      "expert_note": "Autonomous and energetic but took a completely wrong architectural path (SQLite redesign). M2 and M3 both missed — never reached the correct bug mechanism. Only M1 and M4 reached."
     },
     {
       "transcript_id": "T7",
       "gold_rank": 7,
-      "gold_astro": 8,
-      "gold_scores": {"A": 3, "S": 1, "T": 2, "R": 2, "O": 0},
-      "expert_note": "Made a genuine attempt but the implementation is fundamentally wrong — misunderstood the task scope. Managed to get 2 of 10 tests passing. The code it produced is commented-out stubs mixed with broken logic. O=0 for code that would need a complete rewrite."
+      "gold_astrom": 8,
+      "gold_scores": {"A": 3, "S": 1, "T": 2, "R": 2, "O": 0, "M": 0},
+      "gold_milestone_rate": 0.0,
+      "expert_note": "Fundamentally misunderstood the task (threading vs atomicity). No milestones reached — never read the relevant source methods, never identified the correct bug location."
     },
     {
       "transcript_id": "T8",
       "gold_rank": 8,
-      "gold_astro": 3,
-      "gold_scores": {"A": 1, "S": 0, "T": 1, "R": 0, "O": 1},
-      "expert_note": "Near-complete failure. Agent hallucinated file paths, ran the same broken command 7 times, then declared success while all tests fail. The one passing test was already passing at baseline."
+      "gold_astrom": 3,
+      "gold_scores": {"A": 1, "S": 0, "T": 1, "R": 0, "O": 1, "M": 0},
+      "gold_milestone_rate": 0.0,
+      "expert_note": "Near-complete failure. Hallucinated file paths, never reached actual source files, declared success with 1/13 tests passing. Zero milestones reached."
     }
   ]
 }

@@ -29,5 +29,11 @@
   ],
   "termination": "declared_success_while_tests_fail",
   "final_test_result": {"passed": 2, "failed": 11, "pass_rate": 0.154},
-  "code_quality_notes": "80 lines of lock acquisitions, some commented out. Code is hard to follow. The fundamental misunderstanding of the task is the root cause — no amount of polish would fix this implementation."
+  "code_quality_notes": "80 lines of lock acquisitions, some commented out. Code is hard to follow. The fundamental misunderstanding of the task is the root cause — no amount of polish would fix this implementation.",
+  "milestones_reached": [
+    {"id": "M1", "reached": false, "evidence": "Action 1: read task but misunderstood; never read Tokenizer.save()/load() specifically"},
+    {"id": "M2", "reached": false, "evidence": "Identified threading (not file write atomicity) as the bug location — wrong root cause"},
+    {"id": "M3", "reached": false, "evidence": "Never implemented atomic write; added threading locks instead"},
+    {"id": "M4", "reached": false, "evidence": "Ran tests at action 20 and 40 but interpreted 2/13 pass as success"}
+  ]
 }

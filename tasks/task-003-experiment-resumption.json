@@ -19,6 +19,13 @@
     "All existing train.py and prepare.py tests pass"
   ],
   "criteria_weights": [3, 3, 3, 2, 3, 3, 3, 2, 2, 1],
+  "milestones": [
+    {"id": "M1", "description": "Agent reads the training loop in train.py and identifies exactly where elapsed time is tracked before writing any checkpoint code", "weight": 1},
+    {"id": "M2", "description": "Agent designs the checkpoint schema (state_dict, optimizer, scheduler, step, elapsed_s) before implementing save/load", "weight": 2},
+    {"id": "M3", "description": "Agent implements atomic checkpoint save (temp file + rename) before wiring it into the training loop", "weight": 3},
+    {"id": "M4", "description": "Agent correctly subtracts checkpoint.elapsed_s from the time budget on resume (not just resetting to 300s)", "weight": 3},
+    {"id": "M5", "description": "Agent tests both the fresh-start and resume paths before declaring done", "weight": 2}
+  ],
   "test_command": "python -m pytest eval/tests/test_checkpointing.py eval/tests/test_prepare.py -v",
   "budget": {
     "max_actions": 120,

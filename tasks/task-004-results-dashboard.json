@@ -20,6 +20,12 @@
     "All dashboard tests pass"
   ],
   "criteria_weights": [2, 3, 2, 2, 2, 2, 2, 1, 1, 1, 2],
+  "milestones": [
+    {"id": "M1", "description": "Agent reads results.tsv format definition (from program.md or existing files) before writing any parsing code", "weight": 1},
+    {"id": "M2", "description": "Agent handles the empty/header-only file edge case before building the display logic", "weight": 2},
+    {"id": "M3", "description": "Agent computes the running-best (frontier) column correctly — it must be non-decreasing over kept runs", "weight": 2},
+    {"id": "M4", "description": "Agent runs the script against a sample results.tsv and verifies output before adding flags", "weight": 2}
+  ],
   "test_command": "python -m pytest eval/tests/test_results_dashboard.py -v",
   "budget": {
     "max_actions": 100,

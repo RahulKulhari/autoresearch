@@ -1,13 +1,25 @@
-# SWE Agent ASTRO Rubric
+# SWE Agent ASTROM Rubric
 ## Evaluating Long-Horizon Software Engineering Tasks
 
 This rubric defines how to evaluate a SWE agent's performance on long-horizon programming tasks — tasks that require multiple sequential steps, codebase understanding, iterative refinement, and error recovery to complete.
 
-The rubric is inspired by the autoresearch framework: a fixed budget, a ground-truth metric, and a structured loop. Here, the "metric" is the **ASTRO score** (0–25), and the "ground truth" is a task-specific test suite that the agent cannot modify.
+The rubric is inspired by the autoresearch framework: a fixed budget, a ground-truth metric, and a structured loop. Here, the "metric" is the **ASTROM score** (0–30), and the "ground truth" is a task-specific test suite that the agent cannot modify.
 
-Design draws on two external benchmarks:
+Design draws on three external benchmarks:
 - **KLong / PaperBench** (arXiv 2602.17547) — hierarchical rubric trees with weighted binary leaf criteria for fine-grained partial credit
 - **Terminal-Bench** — outcome-driven final-state verification and three failure-mode sub-dimensions for resilience scoring
+- **Process Reward Models (PRM)** — intermediate milestone checking at strategic checkpoints throughout the trajectory, not just at the terminal state
+
+### ORM vs PRM — why both matter for long-horizon tasks
+
+A pure **outcome-only (ORM)** evaluation — check the final state, done — fails for long-horizon tasks because:
+- An agent that reaches 90% of the way and fails at the last step scores identically to one that fails at step 10
+- No signal about *where* in a 150-action trajectory the reasoning broke down
+- No incentive to take a principled, navigable path vs a lucky shortcut
+
+A pure **step-level PRM** evaluation — score every single action — is too noisy and expensive to be practical.
+
+The right granularity is **strategic milestones**: a small set of verifiable intermediate states that any competent path through the task must pass through. This is the M dimension.
 
 ---
 
@@ -169,29 +181,70 @@ This means partial completion is always rewarded proportionally — an agent tha
 | 1 | Poor code that barely functions; would require a full rewrite |
 | 0 | No meaningful output or code is harmful/dangerous |
 
+### M — Milestone Progress (0–5)
+
+*Did the agent reach the key intermediate checkpoints in a sensible order?*
+
+This is the process reward dimension. Each task defines 3–6 **milestones** — ordered, verifiable intermediate states that a competent agent should pass through on any reasonable path to completion. Milestones are checked by a judge reviewing the agent's transcript; they are not final-state assertions.
+
+**Milestone design rules** (when authoring tasks):
+1. Milestones must be **sequential** — reaching M3 implies M1 and M2 were reached
+2. Each milestone must be **verifiable from the transcript** (not from final state)
+3. Milestones should be **path-neutral** — achievable by multiple valid strategies
+4. 3–6 milestones per task; too many becomes step-level scoring
+
+**Scoring:**
+
+| Score | Criterion |
+|-------|-----------|
+| 5 | All milestones reached in natural order; no significant backtracking |
+| 4 | All milestones reached; minor ordering issues or one backtrack |
+| 3 | ≥ 75% of milestones reached; path was mostly coherent |
+| 2 | ≥ 50% of milestones reached; significant detours or skips |
+| 1 | < 50% of milestones reached; trajectory was largely incoherent |
+| 0 | No milestones reached; agent took a completely wrong path from the start |
+
+**Relationship to other dimensions:**
+- M measures *path quality*; S/T measure *outcome quality*. A lucky shortcut can score S=5, T=5, M=2. A systematic agent blocked by an environment bug can score M=5, T=2.
+- M does not penalise exploration — a detour that correctly backtracks when a dead-end is recognised should not reduce M.
+- Milestone completion is checked independently from the S acceptance criteria — a milestone can be reached even if the final implementation does not satisfy the corresponding criterion.
+
+**Milestone spec in task JSON:**
+
+```json
+"milestones": [
+  {"id": "M1", "description": "Agent reads the relevant source files before writing any code", "weight": 1},
+  {"id": "M2", "description": "Agent identifies the specific write/read functions responsible for the bug", "weight": 2},
+  {"id": "M3", "description": "Agent implements atomic write (temp-file pattern) before adding validation", "weight": 3},
+  {"id": "M4", "description": "Agent runs the test suite at least once and reads the output before concluding", "weight": 2}
+]
+```
+
+M score = 5 × Σ(weight_i × reached_i) / Σ(weight_i), rounded to nearest integer.
+
 ---
 
 ## Scoring Summary
 
 ```
-ASTRO Score = A + S + T + R + O
+ASTROM Score = A + S + T + R + O + M
 
-Range:    0 – 25
-Passing:  ≥ 15  (60%)
-Good:     ≥ 20  (80%)
-Excellent: 23+  (92%+)
+Range:    0 – 30
+Passing:  ≥ 18  (60%)
+Good:     ≥ 24  (80%)
+Excellent: 27+  (90%+)
 ```
 
 ### Grade Bands
 
 | Score | Grade | Interpretation |
 |-------|-------|----------------|
-| 23–25 | S | Production-ready; exceeds expectations |
-| 20–22 | A | Strong performance; minor gaps only |
-| 15–19 | B | Passing; core task done with issues |
-| 10–14 | C | Partial completion; significant gaps |
-| 5–9   | D | Mostly failed; marginal attempt |
-| 0–4   | F | Complete failure |
+| 27–30 | S | Production-ready; excellent path and outcome |
+| 24–26 | A | Strong performance; minor gaps only |
+| 18–23 | B | Passing; core task done with issues |
+| 12–17 | C | Partial completion; significant gaps |
+| 6–11  | D | Mostly failed; marginal attempt |
+| 0–5   | F | Complete failure |
 
 ---
 
@@ -214,6 +267,11 @@ Each long-horizon task is defined in a JSON file with the following schema:
     "..."
   ],
   "criteria_weights": [3, 2, 1],
+  "milestones": [
+    {"id": "M1", "description": "Verifiable intermediate state 1", "weight": 1},
+    {"id": "M2", "description": "Verifiable intermediate state 2", "weight": 2},
+    {"id": "M3", "description": "Verifiable intermediate state 3", "weight": 3}
+  ],
   "test_command": "command to run to execute the ground-truth test suite",
   "budget": {
     "max_actions": 150,
@@ -251,7 +309,8 @@ SCORE:
   10. Review transcript for autonomy → A dimension
   11. Review transcript for R-Spec, R-Loop, R-Stop → sum for R dimension
   12. Review final diff for code quality → O dimension
-  13. Compute ASTRO score = A + S + T + R + O
+  13. Review transcript against milestones: for each milestone, was it reached? → weighted M
+  14. Compute ASTROM score = A + S + T + R + O + M
 
 LOG:
   12. Append row to results.tsv (see format below)
@@ -264,31 +323,33 @@ LOG:
 Log results to `swe_results.tsv` (tab-separated, NOT comma-separated):
 
 ```
-task_id	agent	astro_score	A	S	T	R	R_spec	R_loop	R_stop	O	actions	wall_s	test_pass_rate	status	notes
+task_id	agent	astrom_score	A	S	T	R	R_spec	R_loop	R_stop	O	M	milestone_rate	actions	wall_s	test_pass_rate	status	notes
 ```
 
 Columns:
 1. `task_id` — task identifier from spec
 2. `agent` — agent identifier (e.g. `claude-opus-4-6`, `gpt-4o`)
-3. `astro_score` — total ASTRO score (0–25)
+3. `astrom_score` — total ASTROM score (0–30)
 4. `A` — autonomy score (0–5)
-5. `S` — solution completeness, computed via hierarchical criteria weights (0–5)
+5. `S` — solution completeness, hierarchical criteria weights (0–5)
 6. `T` — technical correctness, auto-scored from test suite (0–5)
 7. `R` — total resilience = R_spec + R_loop + R_stop (0–5)
 8. `R_spec` — specification compliance sub-score (0–2)
 9. `R_loop` — loop avoidance sub-score (0–2)
 10. `R_stop` — termination awareness sub-score (0–1)
 11. `O` — output quality (0–5)
-12. `actions` — total agent actions taken
-13. `wall_s` — wall-clock seconds elapsed
-14. `test_pass_rate` — fraction of tests passed (e.g. `0.923`)
-15. `status` — `pass`, `partial`, `fail`, or `crash`
-16. `notes` — short description of outcome
+12. `M` — milestone progress, weighted fraction of checkpoints reached (0–5)
+13. `milestone_rate` — raw weighted fraction of milestones reached (e.g. `0.875`)
+14. `actions` — total agent actions taken
+15. `wall_s` — wall-clock seconds elapsed
+16. `test_pass_rate` — fraction of tests passed (e.g. `0.923`)
+17. `status` — `pass`, `partial`, `fail`, or `crash`
+18. `notes` — short description of outcome
 
 Example row:
 
 ```
-task-001	claude-opus-4-6	21	5	4	5	4	2	1	1	3	87	412	1.000	pass	Fixed race condition; clean diff; 1 edge case missed
+task-001	claude-opus-4-6	26	5	4	5	4	2	1	1	3	5	1.000	87	412	1.000	pass	Perfect path; all milestones; clean diff
 ```
 
 ---

@@ -23,5 +23,11 @@
   "repeated_failures": [],
   "termination": "stopped_after_confirming_success",
   "final_test_result": {"passed": 13, "failed": 0, "pass_rate": 1.0},
-  "code_quality_notes": "28 lines added, 2 lines removed. os.replace() used correctly. RuntimeError message includes expected vs actual vocab_size. No dead code."
+  "code_quality_notes": "28 lines added, 2 lines removed. os.replace() used correctly. RuntimeError message includes expected vs actual vocab_size. No dead code.",
+  "milestones_reached": [
+    {"id": "M1", "reached": true,  "evidence": "Actions 2-4: read prepare.py and both Tokenizer methods before any edit"},
+    {"id": "M2", "reached": true,  "evidence": "Action 6: explicitly planned 'save() for atomic write, load() for validation' — correct identification"},
+    {"id": "M3", "reached": true,  "evidence": "Action 7 (atomic write) precedes action 10 (validation) — correct order"},
+    {"id": "M4", "reached": true,  "evidence": "Actions 14 and 20: ran tests twice, read output before declaring done"}
+  ]
 }

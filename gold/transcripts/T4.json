@@ -22,5 +22,11 @@
   "repeated_failures": [],
   "termination": "stopped_after_confirming_success",
   "final_test_result": {"passed": 12, "failed": 1, "pass_rate": 0.923},
-  "code_quality_notes": "31 lines added. Clean implementation once guided. No unnecessary complexity. One edge case criterion missed."
+  "code_quality_notes": "31 lines added. Clean implementation once guided. No unnecessary complexity. One edge case criterion missed.",
+  "milestones_reached": [
+    {"id": "M1", "reached": true,  "evidence": "Actions 1-8: read task and prepare.py before writing any code"},
+    {"id": "M2", "reached": true,  "evidence": "Correctly targeted write path; question about os.replace vs shutil.move confirms correct location identified"},
+    {"id": "M3", "reached": true,  "evidence": "Atomic write (action 10) implemented before validation (action 24)"},
+    {"id": "M4", "reached": true,  "evidence": "Action 40: ran tests and confirmed 12/13 pass before stopping"}
+  ]
 }

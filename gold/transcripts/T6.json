@@ -23,5 +23,11 @@
   "repeated_failures": [],
   "termination": "stopped_after_justifying_spec_violation",
   "final_test_result": {"passed": 9, "failed": 4, "pass_rate": 0.692},
-  "code_quality_notes": "SQLite implementation is internally clean but the approach is wrong. Introduced a new dependency (sqlite3 is stdlib but the schema design is complex). The explicit rejection of a spec requirement is the key issue."
+  "code_quality_notes": "SQLite implementation is internally clean but the approach is wrong. Introduced a new dependency (sqlite3 is stdlib but the schema design is complex). The explicit rejection of a spec requirement is the key issue.",
+  "milestones_reached": [
+    {"id": "M1", "reached": true,  "evidence": "Actions 2-4: read prepare.py and Tokenizer implementation before writing"},
+    {"id": "M2", "reached": false, "evidence": "Misidentified the solution space — decided on SQLite redesign rather than fixing write atomicity; root cause identification was wrong"},
+    {"id": "M3", "reached": false, "evidence": "Never implemented temp-file+rename; replaced with SQLite (different mechanism entirely)"},
+    {"id": "M4", "reached": true,  "evidence": "Ran tests at action 30 and read output — acknowledged 4 failures but justified them"}
+  ]
 }

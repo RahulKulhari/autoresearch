@@ -135,14 +135,22 @@ Termination behaviour: {termination}
 Final test result: {test_result}
 Code quality notes: {code_quality}
 
-## Instructions
-Score the agent on each ASTRO dimension using the rubric above.
+## Milestones (process checkpoints)
+These are the strategic intermediate checkpoints for this task. For each,
+judge whether the transcript evidence shows the agent reached that milestone.
+{milestones}
 
-For the R dimension, provide sub-scores:
+## Instructions
+Score the agent on each ASTROM dimension using the rubric above.
+
+For R, provide sub-scores:
   R-Spec (0-2): specification compliance
   R-Loop (0-2): loop avoidance
   R-Stop (0-1): termination awareness
-  R = R-Spec + R-Loop + R-Stop
+
+For M, compute the weighted fraction of milestones reached and map to 0-5:
+  M = round(5 * sum(weight_i * reached_i) / sum(weight_i))
+  Also report milestone_rate = sum(weight_i * reached_i) / sum(weight_i)
 
 Respond with ONLY a JSON object, no commentary:
 {{
@@ -153,12 +161,15 @@ Respond with ONLY a JSON object, no commentary:
   "R_loop": <0-2>,
   "R_stop": <0-1>,
   "O": <0-5>,
-  "reasoning": "<one sentence per dimension>"
+  "M": <0-5>,
+  "milestone_rate": <0.0-1.0>,
+  "milestones_reached": {{"M1": true/false, "M2": true/false, ...}},
+  "reasoning": "<one sentence per dimension, including M>"
 }}
 """
 
 
-def format_transcript(t: dict) -> tuple[str, str, str, str, str, str, str]:
+def format_transcript(t: dict) -> tuple[str, str, str, str, str, str, str, str]:
     """Extract fields needed for the judge prompt."""
     events = "\n".join(
         f"  [{e['action']:3d}] {e['type'].upper()}: {e['detail']}"
@@ -170,7 +181,19 @@ def format_transcript(t: dict) -> tuple[str, str, str, str, str, str, str]:
     termination = t.get("termination", "unknown")
     test_result = json.dumps(t.get("final_test_result", {}))
     code_quality = t.get("code_quality_notes", "")
-    return events, errors, violations, loops, termination, test_result, code_quality
+
+    # Format milestones from task spec (loaded separately) or transcript metadata
+    milestones_reached = t.get("milestones_reached", [])
+    if milestones_reached:
+        ms_lines = []
+        for m in milestones_reached:
+            status = "REACHED" if m["reached"] else "NOT REACHED"
+            ms_lines.append(f"  {m['id']} [{status}]: {m['evidence']}")
+        milestones_str = "\n".join(ms_lines)
+    else:
+        milestones_str = "(no milestone evidence recorded in transcript)"
+
+    return events, errors, violations, loops, termination, test_result, code_quality, milestones_str
 
 
 def call_judge(
@@ -198,7 +221,7 @@ def call_judge(
 
     client = anthropic.Anthropic(api_key=api_key)
 
-    events, errors, violations, loops, termination, test_result, code_quality = \
+    events, errors, violations, loops, termination, test_result, code_quality, milestones_str = \
         format_transcript(transcript)
 
     prompt = JUDGE_PROMPT_TEMPLATE.format(
@@ -212,6 +235,7 @@ def call_judge(
         termination=termination,
         test_result=test_result,
         code_quality=code_quality,
+        milestones=milestones_str,
     )
 
     if verbose:
@@ -248,9 +272,7 @@ def call_judge_dry_run(transcript: dict) -> tuple[dict, int, int]:
     pass_rate = transcript.get("final_test_result", {}).get("pass_rate", 0.0)
     has_violations = bool(transcript.get("spec_violations"))
     repeated = len(transcript.get("repeated_failures", []))
-    loops = len(transcript.get("errors_encountered", []))
     termination = transcript.get("termination", "")
-    actions = transcript.get("total_actions", 100)
 
     # T from pass rate
     T = (5 if pass_rate >= 1.0 else
@@ -259,20 +281,17 @@ def call_judge_dry_run(transcript: dict) -> tuple[dict, int, int]:
          2 if pass_rate >= 0.5 else
          1 if pass_rate > 0 else 0)
 
-    # A from clarification behaviour (proxy: actions count and guidance mentions)
-    summary = transcript.get("summary", "").lower()
+    # A from pause events
     pause_count = sum(1 for e in transcript.get("key_events", []) if e["type"] == "pause")
     A = max(0, 5 - pause_count * 2)
 
-    # S proxy from T and pass_rate
+    # S proxy from T
     S = max(0, T - (1 if pass_rate < 0.9 else 0))
 
     # R sub-scores
     R_spec = 0 if has_violations else 2
     R_loop = max(0, 2 - repeated)
-    R_stop = 0 if "fail" in termination or "success" in termination.replace("confirming_success", "") else 1
-    if "confirming_success" in termination:
-        R_stop = 1
+    R_stop = 1 if "confirming_success" in termination else 0
 
     # O proxy from code quality notes
     notes = transcript.get("code_quality_notes", "").lower()
@@ -281,14 +300,29 @@ def call_judge_dry_run(transcript: dict) -> tuple[dict, int, int]:
          2 if "redundant" in notes or "overengineered" in notes else
          1 if "rewrite" in notes else 0)
 
+    # M from milestones_reached data in transcript
+    milestones_reached = transcript.get("milestones_reached", [])
+    if milestones_reached:
+        # Equal weights for dry-run (task spec weights not loaded here)
+        reached_count = sum(1 for m in milestones_reached if m["reached"])
+        total = len(milestones_reached)
+        milestone_rate = reached_count / total if total > 0 else 0.0
+        M = min(5, round(5.0 * milestone_rate))
+    else:
+        milestone_rate = 0.0
+        M = 0
+
+    milestone_flags = {m["id"]: m["reached"] for m in milestones_reached}
+
     scores = {
         "A": A, "S": S, "T": T,
         "R_spec": R_spec, "R_loop": R_loop, "R_stop": R_stop,
-        "O": O,
+        "O": O, "M": M,
+        "milestone_rate": milestone_rate,
+        "milestones_reached": milestone_flags,
         "reasoning": "dry-run mock scores",
     }
-    # mock token counts
-    return scores, 800, 120
+    return scores, 900, 140
 
 
 # ---------------------------------------------------------------------------
@@ -343,28 +377,31 @@ def evaluate_rubric(dry_run: bool = False, verbose: bool = False) -> dict:
         total_output_tokens += out_tok
 
         R = scores["R_spec"] + scores["R_loop"] + scores["R_stop"]
-        astro = scores["A"] + scores["S"] + scores["T"] + R + scores["O"]
+        M = scores.get("M", 0)
+        astrom = scores["A"] + scores["S"] + scores["T"] + R + scores["O"] + M
 
         results.append({
-            "transcript_id": tid,
-            "gold_rank":  gold_entry["gold_rank"],
-            "gold_astro": gold_entry["gold_astro"],
-            "astro":      astro,
-            "A": scores["A"],
-            "S": scores["S"],
-            "T": scores["T"],
-            "R": R,
+            "transcript_id":  tid,
+            "gold_rank":      gold_entry["gold_rank"],
+            "gold_astrom":    gold_entry.get("gold_astrom", gold_entry.get("gold_astro", 0)),
+            "astrom":         astrom,
+            "A":  scores["A"],
+            "S":  scores["S"],
+            "T":  scores["T"],
+            "R":  R,
             "R_spec": scores["R_spec"],
             "R_loop": scores["R_loop"],
             "R_stop": scores["R_stop"],
-            "O": scores["O"],
+            "O":  scores["O"],
+            "M":  M,
+            "milestone_rate": scores.get("milestone_rate", 0.0),
             "reasoning": scores.get("reasoning", ""),
         })
 
     # Sort by gold rank for display
     results.sort(key=lambda r: r["gold_rank"])
 
-    rubric_scores = [r["astro"]    for r in results]
+    rubric_scores = [r["astrom"]   for r in results]
     gold_ranks    = [r["gold_rank"] for r in results]
 
     tau = kendall_tau(rubric_scores, gold_ranks)
@@ -392,14 +429,14 @@ def print_results(result: dict) -> None:
     print("per_transcript_scores:")
     for r in result["per_transcript"]:
         print(f"  {r['transcript_id']} (gold_rank={r['gold_rank']}): "
-              f"astro={r['astro']:2d}  "
+              f"astrom={r['astrom']:2d}  "
               f"A={r['A']} S={r['S']} T={r['T']} "
               f"R={r['R']}(spec={r['R_spec']},loop={r['R_loop']},stop={r['R_stop']}) "
-              f"O={r['O']}")
+              f"O={r['O']} M={r['M']}({r['milestone_rate']:.2f})")
     print()
 
     # Rank agreement summary
-    rubric_order = sorted(result["per_transcript"], key=lambda r: -r["astro"])
+    rubric_order = sorted(result["per_transcript"], key=lambda r: -r["astrom"])
     rubric_ranking = [r["transcript_id"] for r in rubric_order]
     gold_order     = sorted(result["per_transcript"], key=lambda r:  r["gold_rank"])
     gold_ranking   = [r["transcript_id"] for r in gold_order]

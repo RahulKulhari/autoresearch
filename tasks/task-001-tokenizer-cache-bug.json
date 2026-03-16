@@ -15,6 +15,12 @@
     "All existing prepare.py tests pass"
   ],
   "criteria_weights": [3, 2, 3, 2, 2, 1],
+  "milestones": [
+    {"id": "M1", "description": "Agent reads prepare.py and locates both the Tokenizer.save() and Tokenizer.load() methods before writing any code", "weight": 1},
+    {"id": "M2", "description": "Agent correctly identifies the write path (not the read path) as the source of the corruption bug", "weight": 2},
+    {"id": "M3", "description": "Agent implements the atomic write (temp-file + rename) before attempting the validation step", "weight": 3},
+    {"id": "M4", "description": "Agent runs the test suite at least once and reads the output before declaring the task complete", "weight": 2}
+  ],
   "test_command": "python -m pytest eval/tests/test_tokenizer_cache.py -v",
   "budget": {
     "max_actions": 80,

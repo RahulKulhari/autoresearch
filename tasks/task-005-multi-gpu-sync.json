@@ -19,6 +19,13 @@
     "All single-GPU tests pass with CUDA_VISIBLE_DEVICES set to one device"
   ],
   "criteria_weights": [3, 3, 3, 3, 3, 2, 2, 3, 3, 2],
+  "milestones": [
+    {"id": "M1", "description": "Agent reads the MuonAdamW optimizer implementation and identifies why Muon's Nesterov update requires special handling under DDP", "weight": 2},
+    {"id": "M2", "description": "Agent implements GPU auto-detection and the self-relaunch-under-torchrun pattern before touching the training loop", "weight": 3},
+    {"id": "M3", "description": "Agent adds rank-0 guards around all file writes (run.log, results.tsv) before testing multi-GPU path", "weight": 2},
+    {"id": "M4", "description": "Agent verifies single-GPU behaviour is unchanged (CUDA_VISIBLE_DEVICES=0) before testing multi-GPU path", "weight": 3},
+    {"id": "M5", "description": "Agent confirms the 5-minute wall-clock budget is measured on rank-0 only", "weight": 2}
+  ],
   "test_command": "CUDA_VISIBLE_DEVICES=0 python -m pytest eval/tests/test_train_single_gpu.py -v",
   "budget": {
     "max_actions": 150,

@@ -18,6 +18,13 @@
     "New streaming-specific tests pass"
   ],
   "criteria_weights": [3, 3, 2, 3, 2, 3, 3, 1, 2],
+  "milestones": [
+    {"id": "M1", "description": "Agent reads the existing make_dataloader implementation and understands the best-fit packing logic before designing the streaming version", "weight": 1},
+    {"id": "M2", "description": "Agent identifies that the streaming path must preserve the make_dataloader call signature (drop-in replacement requirement)", "weight": 2},
+    {"id": "M3", "description": "Agent implements the lazy shard loading with at most one shard in memory before adding the prefetch thread", "weight": 3},
+    {"id": "M4", "description": "Agent verifies that evaluate_bpb() and the validation loader are untouched after making changes", "weight": 3},
+    {"id": "M5", "description": "Agent runs tests and confirms non-streaming (default) path still passes before finalising", "weight": 2}
+  ],
   "test_command": "python -m pytest eval/tests/test_dataloader.py -v",
   "budget": {
     "max_actions": 150,

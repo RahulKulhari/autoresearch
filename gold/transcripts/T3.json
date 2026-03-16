@@ -30,5 +30,11 @@
   ],
   "termination": "stopped_without_investigating_failures",
   "final_test_result": {"passed": 11, "failed": 2, "pass_rate": 0.846},
-  "code_quality_notes": "68 lines added. LockManager class is a needless abstraction for a 2-line os.replace(). Code is readable but overengineered. 2 test failures not investigated."
+  "code_quality_notes": "68 lines added. LockManager class is a needless abstraction for a 2-line os.replace(). Code is readable but overengineered. 2 test failures not investigated.",
+  "milestones_reached": [
+    {"id": "M1", "reached": true,  "evidence": "Read prepare.py early (implied by knowing to use fcntl), though exploration was shallow"},
+    {"id": "M2", "reached": true,  "evidence": "Correctly targeted the write path; wrong mechanism (fcntl) but correct location"},
+    {"id": "M3", "reached": true,  "evidence": "After pivot at action 10, did implement atomic write before validation — but only after 3 failed retries"},
+    {"id": "M4", "reached": false, "evidence": "Ran tests at action 55 but stopped without investigating 2 failures — milestone requires reading output and acting on it"}
+  ]
 }

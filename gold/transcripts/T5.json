@@ -25,5 +25,11 @@
   "repeated_failures": [],
   "termination": "stopped_with_failing_tests_uninvestigated",
   "final_test_result": {"passed": 9, "failed": 4, "pass_rate": 0.692},
-  "code_quality_notes": "45 lines added. Redundant try/except around every file operation. Validation check is too weak (non-empty file != valid vocab). Core atomic write is correct."
+  "code_quality_notes": "45 lines added. Redundant try/except around every file operation. Validation check is too weak (non-empty file != valid vocab). Core atomic write is correct.",
+  "milestones_reached": [
+    {"id": "M1", "reached": true,  "evidence": "Action 3: skimmed prepare.py, but missed Tokenizer.load() — partial read"},
+    {"id": "M2", "reached": true,  "evidence": "Targeted write path for atomic write; missed validation scope initially"},
+    {"id": "M3", "reached": true,  "evidence": "Atomic write implemented at action 10; validation (weak) added at action 35"},
+    {"id": "M4", "reached": false, "evidence": "Ran tests at action 60 but stopped without investigating 4 failures"}
+  ]
 }

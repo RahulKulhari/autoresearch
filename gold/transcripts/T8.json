@@ -41,5 +41,11 @@
   ],
   "termination": "declared_success_while_tests_fail",
   "final_test_result": {"passed": 1, "failed": 12, "pass_rate": 0.077},
-  "code_quality_notes": "Changes made are to a function that does not exist. Effective diff against baseline is empty for the relevant code paths."
+  "code_quality_notes": "Changes made are to a function that does not exist. Effective diff against baseline is empty for the relevant code paths.",
+  "milestones_reached": [
+    {"id": "M1", "reached": false, "evidence": "Actions 1-3: attempted to read hallucinated file paths; never reached actual source files"},
+    {"id": "M2", "reached": false, "evidence": "Never identified correct bug location; tried to edit non-existent function"},
+    {"id": "M3", "reached": false, "evidence": "No atomic write ever implemented"},
+    {"id": "M4", "reached": false, "evidence": "Ran 'tests' at action 40 but never read the output; declared success with 1/13 pass rate"}
+  ]
 }

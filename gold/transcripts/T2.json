@@ -24,5 +24,11 @@
   "repeated_failures": [],
   "termination": "stopped_after_confirming_success",
   "final_test_result": {"passed": 12, "failed": 1, "pass_rate": 0.923},
-  "code_quality_notes": "35 lines added, 2 removed. Uses tempfile.NamedTemporaryFile correctly. One edge case missed: version field not validated, so old caches with same vocab_size but different vocab pass silently."
+  "code_quality_notes": "35 lines added, 2 removed. Uses tempfile.NamedTemporaryFile correctly. One edge case missed: version field not validated, so old caches with same vocab_size but different vocab pass silently.",
+  "milestones_reached": [
+    {"id": "M1", "reached": true,  "evidence": "Actions 2-4: read prepare.py and Tokenizer methods before any edit"},
+    {"id": "M2", "reached": true,  "evidence": "Identified write path correctly; clarifying question about error format shows understanding"},
+    {"id": "M3", "reached": true,  "evidence": "Atomic write (action 8) implemented before validation (action 15)"},
+    {"id": "M4", "reached": true,  "evidence": "Action 28: ran tests and read 12/12 pass before stopping"}
+  ]
 }

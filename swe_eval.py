@@ -41,8 +41,8 @@ TASKS_DIR = Path("tasks")
 EVAL_TESTS_DIR = Path("eval/tests")
 
 TSV_HEADER = "\t".join([
-    "task_id", "agent", "astro_score",
-    "A", "S", "T", "R", "R_spec", "R_loop", "R_stop", "O",
+    "task_id", "agent", "astrom_score",
+    "A", "S", "T", "R", "R_spec", "R_loop", "R_stop", "O", "M", "milestone_rate",
     "actions", "wall_s", "test_pass_rate",
     "status", "notes",
 ])
@@ -69,6 +69,7 @@ class TaskSpec:
     budget: dict
     eval_weights: dict
     criteria_weights: list[float] = field(default_factory=list)
+    milestones: list[dict] = field(default_factory=list)
 
     @classmethod
     def load(cls, task_id: str) -> "TaskSpec":
@@ -77,8 +78,8 @@ class TaskSpec:
             raise FileNotFoundError(f"Task spec not found: {task_file}")
         with open(task_file) as f:
             data = json.load(f)
-        # criteria_weights is optional in JSON
         data.setdefault("criteria_weights", [])
+        data.setdefault("milestones", [])
         return cls(**data)
 
     def effective_weights(self) -> list[float]:
@@ -92,6 +93,14 @@ class TaskSpec:
                 f"but acceptance_criteria has {n}"
             )
         return [float(w) for w in self.criteria_weights]
+
+    def effective_milestones(self) -> list[dict]:
+        """Return the task's milestone list (may be empty if not defined)."""
+        return self.milestones or []
+
+    def milestone_weights(self) -> list[float]:
+        """Return milestone weights in order."""
+        return [float(m.get("weight", 1)) for m in self.effective_milestones()]
 
 
 @dataclass
@@ -120,21 +129,23 @@ class AstroScore:
     T: int = 0                         # Technical Correctness (auto-scored)
     resilience: ResilienceScore = field(default_factory=ResilienceScore)
     O: int = 0                         # Output Quality
+    M: int = 0                         # Milestone Progress (process reward)
+    milestone_rate: float = 0.0        # Raw weighted fraction of milestones reached
 
     @property
     def R(self) -> int:
         return self.resilience.total()
 
     def total(self) -> int:
-        return self.A + self.S + self.T + self.R + self.O
+        return self.A + self.S + self.T + self.R + self.O + self.M
 
     def grade(self) -> str:
         t = self.total()
-        if t >= 23: return "S"
-        if t >= 20: return "A"
-        if t >= 15: return "B"
-        if t >= 10: return "C"
-        if t >= 5:  return "D"
+        if t >= 27: return "S"
+        if t >= 24: return "A"
+        if t >= 18: return "B"
+        if t >= 12: return "C"
+        if t >= 6:  return "D"
         return "F"
 
     def status(self) -> str:
@@ -150,6 +161,7 @@ class AstroScore:
             ("S", self.S, 0, 5),
             ("T", self.T, 0, 5),
             ("O", self.O, 0, 5),
+            ("M", self.M, 0, 5),
         ]:
             if not (lo <= val <= hi):
                 raise ValueError(f"Dimension {name} must be {lo}–{hi}, got {val}")
@@ -175,7 +187,7 @@ class RunRecord:
             str(s.total()),
             str(s.A), str(s.S), str(s.T),
             str(s.R), str(r.spec), str(r.loop), str(r.stop),
-            str(s.O),
+            str(s.O), str(s.M), f"{s.milestone_rate:.3f}",
             str(self.actions),
             f"{self.wall_s:.1f}",
             f"{self.test_pass_rate:.3f}",
@@ -271,6 +283,33 @@ def score_t_dimension(pass_rate: float, test_output: str) -> int:
     if pass_rate >= 0.50: return 2
     if pass_rate > 0.0:   return 1
     return 0
+
+
+def score_m_dimension(
+    milestones_reached: list[bool],
+    weights: list[float],
+) -> tuple[int, float]:
+    """
+    Milestone Progress (M) scoring — process reward model.
+
+    Mirrors score_s_dimension but operates on intermediate milestone checkpoints
+    rather than final acceptance criteria.
+
+    Args:
+        milestones_reached: parallel list of True/False per milestone
+        weights:            parallel list of weights
+
+    Returns:
+        (M score 0–5, milestone_rate 0.0–1.0)
+    """
+    if not milestones_reached:
+        return 0, 0.0
+    total_weight = sum(weights)
+    if total_weight == 0:
+        return 0, 0.0
+    weighted_reached = sum(w for w, hit in zip(weights, milestones_reached) if hit)
+    rate = weighted_reached / total_weight
+    return min(5, round(5.0 * rate)), rate
 
 
 def score_s_dimension(
@@ -387,11 +426,23 @@ def cmd_run(task_id: str, agent: str) -> None:
     print()
     print("O — Output Quality (0–5): Is the code clean and idiomatic?")
     print()
+
+    milestones = task.effective_milestones()
+    if milestones:
+        print("M — Milestone Progress (process reward, 0–5)")
+        print("  Review the transcript and mark each milestone reached (1) or not (0):")
+        for m in milestones:
+            print(f"    [{m['id']}] weight={m['weight']}  {m['description']}")
+        print("  Then pass --M-milestones '1,0,1,...' (or --M <0-5> to override)")
+    else:
+        print("M — Milestone Progress (0–5): no milestones defined for this task; use --M 0")
+    print()
     print("Run this to record scores:")
     print(f"  python swe_eval.py score {task_id} --agent {agent} \\")
     print(f"    --A <0-5> --S-criteria '1,1,...' --T {t_score} \\")
     print(f"    --R-spec <0-2> --R-loop <0-2> --R-stop <0-1> \\")
-    print(f"    --O <0-5> --actions <n> --wall-s <s> --notes '<notes>'")
+    print(f"    --O <0-5> --M-milestones '1,0,...' \\")
+    print(f"    --actions <n> --wall-s <s> --notes '<notes>'")
 
 
 def cmd_score(
@@ -405,6 +456,8 @@ def cmd_score(
     R_loop: int,
     R_stop: int,
     O: int,
+    M_override: int | None,
+    M_milestones_str: str | None,
     actions: int,
     wall_s: float,
     notes: str,
@@ -438,8 +491,29 @@ def cmd_score(
               f"Using auto-scored value.")
     T = t_auto
 
+    # ── Compute M ───────────────────────────────────────────────────────────
+    if M_milestones_str is not None:
+        m_reached = [bool(int(x.strip())) for x in M_milestones_str.split(",")]
+        m_weights = task.milestone_weights()
+        if not m_weights:
+            m_weights = [1.0] * len(m_reached)
+        if len(m_reached) != len(m_weights):
+            print(f"[ERROR] --M-milestones has {len(m_reached)} values but task has "
+                  f"{len(m_weights)} milestones.")
+            sys.exit(1)
+        M, milestone_rate = score_m_dimension(m_reached, m_weights)
+        print(f"M dimension (process reward): {M}/5  (milestone rate: {milestone_rate:.1%})")
+    elif M_override is not None:
+        M = M_override
+        milestone_rate = M / 5.0
+        print(f"M dimension (manual override): {M}/5")
+    else:
+        print("[ERROR] Provide either --M-milestones or --M")
+        sys.exit(1)
+
     resilience = ResilienceScore(spec=R_spec, loop=R_loop, stop=R_stop)
-    score = AstroScore(A=A, S=S, T=T, resilience=resilience, O=O)
+    score = AstroScore(A=A, S=S, T=T, resilience=resilience, O=O, M=M,
+                       milestone_rate=milestone_rate)
     score.validate()
 
     record = RunRecord(
@@ -477,28 +551,29 @@ def cmd_report() -> None:
         return
 
     rows = [line.split("\t") for line in lines[1:] if line.strip()]
-    rows = [r for r in rows if len(r) >= 16]
+    rows = [r for r in rows if len(r) >= 18]
 
     if not rows:
         print("No results recorded yet.")
         return
 
-    print(f"{'Task':<15} {'Agent':<20} {'ASTRO':>5} {'A':>2} {'S':>2} {'T':>2} "
-          f"{'R':>2} {'Rsp':>3} {'Rlp':>3} {'Rst':>3} {'O':>2} "
+    print(f"{'Task':<15} {'Agent':<20} {'ASTROM':>6} {'A':>2} {'S':>2} {'T':>2} "
+          f"{'R':>2} {'Rsp':>3} {'Rlp':>3} {'Rst':>3} {'O':>2} {'M':>2} {'Mile%':>6} "
           f"{'Actions':>7} {'Wall':>6} {'Tests':>6} {'Status':<8} Notes")
-    print("─" * 115)
+    print("─" * 128)
 
     for r in rows:
-        (task_id, agent, total, A, S, T, R, R_spec, R_loop, R_stop, O,
+        (task_id, agent, total, A, S, T, R, R_spec, R_loop, R_stop, O, M, mile_rate,
          actions, wall_s, pass_rate, status, *notes) = r
-        notes_str = " ".join(notes)[:35]
+        notes_str = " ".join(notes)[:30]
         grade = AstroScore(
             A=int(A), S=int(S), T=int(T),
             resilience=ResilienceScore(int(R_spec), int(R_loop), int(R_stop)),
-            O=int(O),
+            O=int(O), M=int(M),
         ).grade()
-        print(f"{task_id:<15} {agent:<20} {total:>4}{grade} {A:>2} {S:>2} {T:>2} "
-              f"{R:>2} {R_spec:>3} {R_loop:>3} {R_stop:>3} {O:>2} "
+        print(f"{task_id:<15} {agent:<20} {total:>5}{grade} {A:>2} {S:>2} {T:>2} "
+              f"{R:>2} {R_spec:>3} {R_loop:>3} {R_stop:>3} {O:>2} {M:>2} "
+              f"{float(mile_rate):>5.1%} "
               f"{actions:>7} {wall_s:>6} {float(pass_rate):>5.1%} "
               f"{status:<8} {notes_str}")
 
@@ -511,17 +586,18 @@ def _print_scorecard(record: RunRecord) -> None:
     print(f"  ASTRO SCORECARD — {record.task_id}")
     print("=" * width)
     print(f"  Agent:    {record.agent}")
-    print(f"  Grade:    {s.grade()}  ({s.total()}/25)")
+    print(f"  Grade:    {s.grade()}  ({s.total()}/30)")
     print(f"  Status:   {s.status().upper()}")
     print("─" * width)
     print(f"  A  Autonomy                    {s.A}/5")
-    print(f"  S  Solution Completeness       {s.S}/5  (hierarchical)")
-    print(f"  T  Technical Correctness       {s.T}/5  ← auto-scored")
+    print(f"  S  Solution Completeness       {s.S}/5  (hierarchical, outcome)")
+    print(f"  T  Technical Correctness       {s.T}/5  ← auto-scored (final state)")
     print(f"  R  Resilience                  {s.R}/5")
     print(f"       R-Spec  spec compliance   {r.spec}/2")
     print(f"       R-Loop  loop avoidance    {r.loop}/2")
     print(f"       R-Stop  termination       {r.stop}/1")
     print(f"  O  Output Quality              {s.O}/5")
+    print(f"  M  Milestone Progress          {s.M}/5  (process, {s.milestone_rate:.1%} reached)")
     print("─" * width)
     print(f"  Actions:  {record.actions}")
     print(f"  Wall:     {record.wall_s:.0f}s")
@@ -574,6 +650,15 @@ def main() -> None:
     p.add_argument("--R-stop", type=int, required=True, dest="R_stop",
                    help="Termination awareness (0–1)")
     p.add_argument("--O", type=int, required=True)
+    # M: either milestone list or direct override
+    m_grp = p.add_mutually_exclusive_group(required=True)
+    m_grp.add_argument(
+        "--M-milestones",
+        dest="M_milestones",
+        metavar="'1,0,1,...'",
+        help="Comma-separated 0/1 per milestone (computes M via weighted sum)",
+    )
+    m_grp.add_argument("--M", type=int, dest="M_override", help="Direct M score 0–5")
     p.add_argument("--actions", type=int, default=0)
     p.add_argument("--wall-s", type=float, dest="wall_s", default=0.0)
     p.add_argument("--notes", default="")
@@ -596,6 +681,8 @@ def main() -> None:
             args.T,
             args.R_spec, args.R_loop, args.R_stop,
             args.O,
+            args.M_override,
+            args.M_milestones,
             args.actions, args.wall_s, args.notes,
         )
     elif args.command == "report":
