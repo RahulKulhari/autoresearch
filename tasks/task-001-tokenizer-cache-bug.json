@@ -1,0 +1,25 @@
+{
+  "id": "task-001",
+  "title": "Fix tokenizer cache corruption under concurrent access",
+  "category": "bug_fix",
+  "difficulty": "hard",
+  "description": "The tokenizer cache in prepare.py intermittently produces incorrect token encodings when the cache file is written by one process and read by another simultaneously. Users report that, in rare cases, the training data contains garbled tokens leading to sudden val_bpb spikes mid-run.\n\nThe bug manifests in the following scenario:\n  1. Process A begins writing tokenizer vocab to ~/.cache/autoresearch/tokenizer.json\n  2. Process B reads the file mid-write and gets a truncated/corrupt JSON blob\n  3. Process B's Tokenizer silently falls back to an empty vocabulary\n  4. Downstream data loaders emit UNK tokens for everything\n\nThe fix must:\n  - Make the write atomic (write to a temp file, then rename)\n  - Add a validation step after loading (check that vocab_size matches expectation)\n  - Raise a clear, descriptive error if corruption is detected (not a silent fallback)\n  - Be backward-compatible with existing cache files\n\nNote: The training pipeline must continue to work unchanged. The fix lives in the cache read/write layer only.",
+  "repo": ".",
+  "initial_commit": "c2450ad",
+  "acceptance_criteria": [
+    "Tokenizer cache writes are atomic (temp-file + rename pattern)",
+    "After loading, vocab size is validated against expected size",
+    "Corrupt or truncated cache raises RuntimeError with a descriptive message",
+    "Existing valid cache files are still loaded correctly",
+    "No change to the public Tokenizer API (encode/decode signatures unchanged)",
+    "All existing prepare.py tests pass"
+  ],
+  "test_command": "python -m pytest eval/tests/test_tokenizer_cache.py -v",
+  "budget": {
+    "max_actions": 80,
+    "max_wall_seconds": 900
+  },
+  "eval_weights": {
+    "note": "Default weights — all dimensions equal"
+  }
+}

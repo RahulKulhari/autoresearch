@@ -1,0 +1,29 @@
+{
+  "id": "task-005",
+  "title": "Extend autoresearch to support multi-GPU runs with gradient synchronization",
+  "category": "feature",
+  "difficulty": "very_hard",
+  "description": "Currently autoresearch runs on a single GPU. Some users have machines with 2–4 GPUs and want to use them all. Add multi-GPU support using PyTorch DDP (DistributedDataParallel) while preserving everything that makes autoresearch work: the 5-minute budget, the val_bpb metric, git-based experiment tracking.\n\nKey requirements:\n  - Auto-detect number of available GPUs. If only 1 GPU, run as before (no DDP overhead).\n  - If >1 GPU, launch training with torchrun (DDP). The existing `uv run train.py` invocation must still work; internally it should re-launch itself under torchrun if needed.\n  - Effective batch size scales with number of GPUs (TOTAL_BATCH_SIZE splits across GPUs)\n  - The 5-minute budget is wall-clock time on rank 0 (same as single-GPU)\n  - val_bpb evaluation runs only on rank 0 after barrier sync\n  - Only rank 0 writes to results.tsv and run.log\n  - peak_vram_mb reported is the max across all ranks\n  - The MuonAdamW optimizer must work correctly under DDP (Muon requires all-reduce for gradient orthogonalization)\n  - All existing single-GPU tests must pass when CUDA_VISIBLE_DEVICES limits to 1 GPU\n\nDo NOT add any new dependencies. Use only torch.distributed which is already available via the PyTorch install.",
+  "repo": ".",
+  "initial_commit": "c2450ad",
+  "acceptance_criteria": [
+    "With 1 GPU (or CUDA_VISIBLE_DEVICES=0), training behavior is identical to baseline",
+    "With 2+ GPUs, training launches via DDP automatically",
+    "uv run train.py works as the sole entry point (no separate launch command needed)",
+    "Effective batch size is TOTAL_BATCH_SIZE regardless of GPU count",
+    "val_bpb is evaluated only on rank 0 after all ranks sync",
+    "Only rank 0 writes to run.log and results.tsv",
+    "peak_vram_mb is the max across all ranks",
+    "MuonAdamW Nesterov update uses properly all-reduced gradients",
+    "5-minute budget is enforced on wall clock (rank 0 clock)",
+    "All single-GPU tests pass with CUDA_VISIBLE_DEVICES set to one device"
+  ],
+  "test_command": "CUDA_VISIBLE_DEVICES=0 python -m pytest eval/tests/test_train_single_gpu.py -v",
+  "budget": {
+    "max_actions": 150,
+    "max_wall_seconds": 2400
+  },
+  "eval_weights": {
+    "note": "Default weights — all dimensions equal"
+  }
+}

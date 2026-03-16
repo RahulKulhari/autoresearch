@@ -1,0 +1,28 @@
+{
+  "id": "task-002",
+  "title": "Add streaming data loader for datasets that exceed RAM",
+  "category": "feature",
+  "difficulty": "very_hard",
+  "description": "Currently the data loader in prepare.py loads all training shards into memory before training begins. This works on machines with abundant RAM but fails on systems with less than ~16 GB free, as the full dataset can exceed available memory.\n\nImplement a streaming data loader that:\n  - Reads shards from disk on demand rather than preloading\n  - Maintains the same interface as the existing make_dataloader function (drop-in replacement)\n  - Supports the best-fit packing strategy already implemented (pack sequences to fill the context window)\n  - Prefetches the next shard in a background thread to hide I/O latency\n  - Handles the case where a shard file is missing or corrupt (log a warning and skip)\n\nThe existing non-streaming loader should remain as a fallback, selectable via a parameter. The default behavior should NOT change for users who have enough RAM (i.e., detect available memory and choose automatically, or expose a `streaming=True` argument).\n\nDo NOT change the evaluation function evaluate_bpb() or the validation data loading path — only training data loading is in scope.",
+  "repo": ".",
+  "initial_commit": "c2450ad",
+  "acceptance_criteria": [
+    "make_dataloader accepts a streaming=True keyword argument",
+    "Streaming mode loads shards lazily (only one shard in RAM at a time)",
+    "Background prefetch thread is used to hide I/O latency",
+    "Best-fit packing is preserved in streaming mode",
+    "Missing or corrupt shards are skipped with a logged warning",
+    "Non-streaming (default) behavior is unchanged",
+    "evaluate_bpb() and the validation loader are untouched",
+    "All existing prepare.py tests pass",
+    "New streaming-specific tests pass"
+  ],
+  "test_command": "python -m pytest eval/tests/test_dataloader.py -v",
+  "budget": {
+    "max_actions": 150,
+    "max_wall_seconds": 1800
+  },
+  "eval_weights": {
+    "note": "Default weights — all dimensions equal"
+  }
+}

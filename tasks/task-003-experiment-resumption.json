@@ -1,0 +1,29 @@
+{
+  "id": "task-003",
+  "title": "Implement checkpoint-based experiment resumption in train.py",
+  "category": "feature",
+  "difficulty": "hard",
+  "description": "Currently, if training is interrupted mid-run (power loss, OOM after 4 minutes, SSH disconnect), the entire 5-minute budget is wasted. Add checkpoint support so that training can resume from where it left off.\n\nRequirements:\n  - Save a checkpoint every 60 seconds of training time (wall clock, not step count)\n  - Checkpoint must include: model state_dict, optimizer state_dict, scheduler state, current step count, elapsed training seconds\n  - On startup, detect and load the latest valid checkpoint automatically\n  - If a checkpoint is loaded, the remaining time budget is TOTAL_BUDGET - checkpoint.elapsed_seconds\n  - Checkpoints are saved to ~/.cache/autoresearch/checkpoints/<run-id>/ where run-id is the current git commit hash (short)\n  - Atomic saves: write to a .tmp file, rename on success\n  - Keep only the last 2 checkpoints to avoid filling disk\n  - A --no-resume flag disables loading checkpoints (for a clean baseline run)\n\nThe 5-minute time budget measured by prepare.py's training loop must remain accurate. The checkpoint elapsed time must be subtracted correctly so the total training always sums to ≤ 5 minutes.",
+  "repo": ".",
+  "initial_commit": "c2450ad",
+  "acceptance_criteria": [
+    "Checkpoint saved every 60 wall-clock seconds of training",
+    "Checkpoint includes model state, optimizer state, scheduler state, step, elapsed_s",
+    "Checkpoint saved atomically (temp file + rename)",
+    "At most 2 checkpoints retained per run-id",
+    "On startup, latest valid checkpoint is loaded automatically",
+    "Remaining budget = 300s - checkpoint.elapsed_s after resume",
+    "Total training time across original + resumed run ≤ 305s",
+    "--no-resume flag forces clean start",
+    "val_bpb output is identical whether or not a checkpoint was used (deterministic up to hardware)",
+    "All existing train.py and prepare.py tests pass"
+  ],
+  "test_command": "python -m pytest eval/tests/test_checkpointing.py eval/tests/test_prepare.py -v",
+  "budget": {
+    "max_actions": 120,
+    "max_wall_seconds": 1800
+  },
+  "eval_weights": {
+    "note": "Default weights — all dimensions equal"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "task-004",
+  "title": "Build a CLI dashboard for experiment results from results.tsv",
+  "category": "feature",
+  "difficulty": "medium",
+  "description": "The existing analysis.ipynb notebook requires Jupyter to view results. Add a standalone CLI script (results_dashboard.py) that renders a rich terminal dashboard from results.tsv, usable over SSH without a GUI.\n\nThe dashboard must display:\n  1. Summary banner: total experiments, best val_bpb, baseline val_bpb, total improvement, improvement %\n  2. Per-run table: commit, val_bpb, memory_gb, status (color-coded: keep=green, discard=yellow, crash=red), description\n  3. Running best (frontier) line: show the val_bpb of the best kept run at each row\n  4. A sparkline of val_bpb over time (ASCII, shows kept runs only)\n  5. Session statistics: keep rate, crash rate, average val_bpb delta per kept experiment\n\nTechnical constraints:\n  - No new dependencies. Must work with only Python stdlib and what's already in pyproject.toml\n  - Must handle empty results.tsv gracefully (print 'No results yet')\n  - Must handle malformed rows (skip with a warning)\n  - Works correctly when results.tsv has only a header row\n  - Optional --tail N flag: show only the last N experiments (useful for long runs)\n  - Optional --kept-only flag: show only 'keep' status rows",
+  "repo": ".",
+  "initial_commit": "c2450ad",
+  "acceptance_criteria": [
+    "results_dashboard.py runs with no extra dependencies (stdlib + pyproject.toml only)",
+    "Displays summary banner with baseline, best, improvement statistics",
+    "Per-run table with color-coded status (green/yellow/red via ANSI codes)",
+    "Running best column shows frontier val_bpb at each row",
+    "ASCII sparkline of val_bpb over time for kept runs",
+    "Session statistics section at bottom",
+    "Handles empty file and header-only file gracefully",
+    "Skips malformed rows with a stderr warning",
+    "--tail N flag works correctly",
+    "--kept-only flag works correctly",
+    "All dashboard tests pass"
+  ],
+  "test_command": "python -m pytest eval/tests/test_results_dashboard.py -v",
+  "budget": {
+    "max_actions": 100,
+    "max_wall_seconds": 1200
+  },
+  "eval_weights": {
+    "note": "Default weights — all dimensions equal"
+  }
+}
